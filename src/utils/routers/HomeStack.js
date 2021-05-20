@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import HomeScreen from '../../screens/HomeScreen';
 import OutgoingScreen from '../../screens/OutgoingScreen';
-import IncomingScreen from '../../screens/IncomingScreen.class';
+import IncomingScreen from '../../screens/IncomingScreen';
 import {createStackNavigator} from '@react-navigation/stack';
 const Stack = createStackNavigator();
 const HomeStack = () => {

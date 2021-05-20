@@ -22,31 +22,28 @@ const HomeScreen = ({navigation}) => {
   const [callDetails, setCallDetails] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(false);
   useEffect(async () => {
     try {
       const value = await AsyncStorage.getItem('user');
       if (value !== null) {
         setUserData(JSON.parse(value));
+        getCallStatus(JSON.parse(value));
+        getUsers(JSON.parse(value));
       }
     } catch (e) {
       alert(e);
     }
   }, []);
-  useEffect(() => {
-    getUsers();
-    getCallStatus();
-  }, [userData]);
 
-  const getUsers = () => {
+  const getUsers = user => {
     setLoading(true);
     firebase
       .database()
       .ref('/users')
       .once('value', snap => {
         let arr = Object.entries(snap.val());
-        const myIndex = arr.findIndex(
-          obj => obj[1].firebaseUid === userData.uid,
-        );
+        const myIndex = arr.findIndex(obj => obj[1].firebaseUid === user.uid);
         console.log(myIndex);
         arr.splice(myIndex, 1);
         setUsers(arr);
@@ -55,12 +52,12 @@ const HomeScreen = ({navigation}) => {
       });
   };
 
-  const getCallStatus = () => {
-    console.log(userData.uid);
+  const getCallStatus = user => {
+    console.log(user.uid);
     try {
       firebase
         .database()
-        .ref('/users/' + userData.uid)
+        .ref('/users/' + user.uid)
         .child('currentCallingId')
         .on('value', snap => {
           if (snap.val() !== null) {
@@ -72,39 +69,46 @@ const HomeScreen = ({navigation}) => {
                 .once('value', snapshot => {
                   if (snapshot.val().offerIceCandidate) {
                     setCallDetails(snapshot.val());
+                    setIncomingCall(true);
                     console.log('homecalldetails', snapshot.key);
-                    Alert.alert(
-                      'Incoming Call',
-                      snapshot.val().senderName,
-                      [
-                        {
-                          text: 'Answer',
-                          onPress: () =>
-                            navigation.navigate('Incoming', {
-                              callDetails: {
-                                key: snapshot.key,
-                                offerIceCandidate:
-                                  snapshot.val().offerIceCandidate,
-                                offerLocalDescription:
-                                  snapshot.val().offerLocalDescription,
-                                revceiver: snapshot.val().receiver,
-                                sender: snapshot.val().sender,
-                                senderName: snapshot.val().senderName,
-                              },
-                            }),
-                        },
-                        {text: ''},
-                        {
-                          text: 'Reject',
-                          onPress: () =>
-                            firebase
-                              .database()
-                              .ref('/users/' + userData.uid)
-                              .update({currentCallingId: null}),
-                        },
-                      ],
-                      {cancelable: false},
-                    );
+                    if (incomingCall) {
+                      Alert.alert(
+                        'Incoming Call',
+                        snapshot.val().senderName,
+                        [
+                          {
+                            text: 'Answer',
+                            onPress: () => {
+                              setIncomingCall(false);
+                              navigation.navigate('Incoming', {
+                                callDetails: {
+                                  key: snapshot.key,
+                                  offerIceCandidate:
+                                    snapshot.val().offerIceCandidate,
+                                  offerLocalDescription:
+                                    snapshot.val().offerLocalDescription,
+                                  revceiver: snapshot.val().receiver,
+                                  sender: snapshot.val().sender,
+                                  senderName: snapshot.val().senderName,
+                                },
+                              });
+                            },
+                          },
+                          {text: ''},
+                          {
+                            text: 'Reject',
+                            onPress: () => {
+                              setIncomingCall(false);
+                              firebase
+                                .database()
+                                .ref('/users/' + user.uid)
+                                .update({currentCallingId: null});
+                            },
+                          },
+                        ],
+                        {cancelable: false},
+                      );
+                    }
                   }
                 });
             } catch (error) {
@@ -149,8 +153,8 @@ const HomeScreen = ({navigation}) => {
           refreshing={refreshing}
           onRefresh={() => {
             setRefreshing(true);
-            getUsers();
-            getCallStatus();
+            getUsers(userData);
+            getCallStatus(userData);
           }}
           renderItem={({item}) => {
             return (

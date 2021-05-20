@@ -39,14 +39,8 @@ const IncomingScreen = ({navigation, route}) => {
     }
   }, []);
 
-  // useEffect(() => {
-  //   startLocalStream();
-  // }, [user]);
-  // useEffect(() => {
-  //   startCall();
-  // }, [localStream]);
+
   const startLocalStream = async () => {
-    // isFront will determine if the initial camera should face user or environment
 
     const devices = await mediaDevices.enumerateDevices();
     const facing = isFront ? 'front' : 'environment';
@@ -66,11 +60,11 @@ const IncomingScreen = ({navigation, route}) => {
         : false,
     };
     const newStream = await mediaDevices.getUserMedia(constraints);
+
     setLocalStream(newStream);
-    startCall();
+    startCall(newStream);
   };
-  const startCall = async () => {
-    // You'll most likely need to use a STUN server at least. Look into TURN and decide if that's necessary for your project
+  const startCall = async stream => {
     const configuration = {
       iceServers: [
         {
@@ -79,8 +73,34 @@ const IncomingScreen = ({navigation, route}) => {
       ],
     };
     const localPC = new RTCPeerConnection(configuration);
-    localPC.addStream(localStream);
-    
+    localPC.addStream(stream);
+    localPC.onaddstream = e => {
+      console.log('onaddstream');
+      if (e.stream && remoteStream !== e.stream) {
+        setRemoteStream(e.stream);
+      }
+    };
+    localPC.onicecandidate = async e => {
+      try {
+        if (e.candidate != null) {
+          let newAnswerIceCandiate = [];
+          newAnswerIceCandiate.push(e.candidate);
+          await setAnswerIceCandiate(newAnswerIceCandiate);
+          console.log(newAnswerIceCandiate);
+          try {
+            firebase
+              .database()
+              .ref('/call_manager')
+              .child(callDetails.key)
+              .update({answerIceCandiate: newAnswerIceCandiate});
+          } catch (e) {
+            console.log('offerIce:' + e);
+          }
+        }
+      } catch (err) {
+        console.error(`Error adding remotePC iceCandidate: ${err}`);
+      }
+    };
     try {
       await localPC.setRemoteDescription(callDetails.offerLocalDescription);
       const answer = await localPC.createAnswer();
@@ -97,43 +117,18 @@ const IncomingScreen = ({navigation, route}) => {
     } catch (e) {
       console.log(e);
     }
-
     callDetails.offerIceCandidate.forEach(async data => {
       try {
-         localPC.addIceCandidate(data);
+        await localPC.addIceCandidate(data);
       } catch (e) {
         console.log('answer Ice' + e);
       }
     });
-    // could also use "addEventListener" for these callbacks, but you'd need to handle removing them as well
-    localPC.onicecandidate =  e => {
-      console.log(e);
-      try {
-        if (e.candidate) {
-          let newAnswerIceCandiate = [...answerIceCandiate, e.candidate];
-          setAnswerIceCandiate(newAnswerIceCandiate);
-          try {
-            firebase
-              .database()
-              .ref('/call_manager')
-              .child(callDetails.key)
-              .update({answerIceCandiate: newAnswerIceCandiate});
-          } catch (e) {
-            console.log('offerIce:' + e);
-          }
-        }
-      } catch (err) {
-        console.error(`Error adding remotePC iceCandidate: ${err}`);
-      }
-    };
+
     localPC.onconnectionstatechange = e => {
-      console.log(e);
+      // console.log(e);
     };
-    localPC.onaddstream = e => {
-      if (e.stream && remoteStream !== e.stream) {
-        setRemoteStream(e.stream);
-      }
-    };
+
     setCachedLocalPC(localPC);
   };
 
@@ -206,6 +201,7 @@ const IncomingScreen = ({navigation, route}) => {
               objectFit={'cover'}
               style={{height: '100%', width: '100%'}}
               streamURL={localStream.toURL()}
+              mirror={true}
             />
           )}
         </View>

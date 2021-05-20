@@ -24,7 +24,7 @@ const {height, width} = Dimensions.get('window');
 const proportional = (height * width) / height + width;
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {CommonActions} from '@react-navigation/native';
-import  firebase from '../utils/constants/firebase';
+import firebase from '../utils/constants/firebase';
 const LoginScreen = ({navigation}) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -73,16 +73,13 @@ const LoginScreen = ({navigation}) => {
         .catch(error => {
           setLoading(false);
           switch (error.code) {
-            case 'The password is invalid or the user does not have a password.':
+            default:
               Toast.show({
-                text: 'Wrong email or password!!',
+                text: error.code,
                 buttonText: '',
                 type: 'danger',
                 position: 'bottom',
               });
-              break;
-            default:
-              alert(error);
               break;
           }
         });

@@ -62,7 +62,6 @@ const OutgoingScreen = ({navigation, route}) => {
   }, [localStream]);
 
   const startLocalStream = async () => {
-    // isFront will determine if the initial camera should face user or environment
 
     const devices = await mediaDevices.enumerateDevices();
     const facing = isFront ? 'front' : 'environment';
@@ -86,7 +85,6 @@ const OutgoingScreen = ({navigation, route}) => {
   };
 
   const startCall = async () => {
-    // You'll most likely need to use a STUN server at least. Look into TURN and decide if that's necessary for your project
     const configuration = {
       iceServers: [
         {
@@ -97,11 +95,16 @@ const OutgoingScreen = ({navigation, route}) => {
     const localPC = new RTCPeerConnection(configuration);
     console.log('localstream', localStream);
     localPC.addStream(localStream);
-    // could also use "addEventListener" for these callbacks, but you'd need to handle removing them as well
+    localPC.onaddstream = e => {
+      if (e.stream && remoteStream !== e.stream) {
+        setRemoteStream(e.stream);
+      }
+    };
     localPC.onicecandidate = async e => {
       try {
         if (e.candidate) {
-          let newOfferIceCandidate = [...offerIceCandidate, e.candidate];
+          let newOfferIceCandidate = [];
+          newOfferIceCandidate.push(e.candidate);
           await setOfferIceCandidate(newOfferIceCandidate);
           try {
             firebase
@@ -170,11 +173,7 @@ const OutgoingScreen = ({navigation, route}) => {
       console.log(e);
     }
 
-    localPC.onaddstream = e => {
-      if (e.stream && remoteStream !== e.stream) {
-        setRemoteStream(e.stream);
-      }
-    };
+    
 
     setCachedLocalPC(localPC);
   };
@@ -228,6 +227,7 @@ const OutgoingScreen = ({navigation, route}) => {
               objectFit={'cover'}
               style={{width: '100%', height: '100%'}}
               streamURL={remoteStream.toURL()}
+              mirror={true}
             />
           )}
         </View>
@@ -247,6 +247,7 @@ const OutgoingScreen = ({navigation, route}) => {
               objectFit={'cover'}
               style={{height: '100%', width: '100%'}}
               streamURL={localStream.toURL()}
+              mirror={true}
             />
           )}
         </View>
